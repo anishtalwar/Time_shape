@@ -1,15 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { generateBasePattern, applyFeel } from './groove';
+import { GrooveScheduler } from './audio';
 import GrooveFingerprint from './components/GrooveFingerprint';
 import FeelControl from './components/FeelControl';
 import StateChip from './components/StateChip';
 import './App.css';
 
 const BASE = generateBasePattern();
+const STEP_COUNT = 16;
 
 const DEFAULT_FEEL = { tight: 0.5, push: 0.5, swing: 0.5, accent: 0.5, drift: 0.5 };
 
 const PRESET_NAMES = ['late & loose', 'tight bounce', 'broken swing', 'nervous pocket'];
+
+// Singleton scheduler
+const scheduler = new GrooveScheduler();
 
 export default function App() {
   const [feel, setFeel] = useState(DEFAULT_FEEL);
@@ -17,36 +22,34 @@ export default function App() {
   const [activeState, setActiveState] = useState(null);
   const [isAB, setIsAB] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [playhead, setPlayhead] = useState(0);
-
-  const playheadRef = useRef(0);
-  const rafRef      = useRef(null);
-  const startRef    = useRef(null);
-  const LOOP_MS     = 2000;
+  const [currentStep, setCurrentStep] = useState(-1);
 
   const notes      = applyFeel(BASE, feel);
   const ghostNotes = isAB ? BASE : null;
 
-  // Playhead animation
-  const tick = useCallback((ts) => {
-    if (!startRef.current) startRef.current = ts;
-    const elapsed = (ts - startRef.current) % LOOP_MS;
-    const p = elapsed / LOOP_MS;
-    playheadRef.current = p;
-    setPlayhead(p);
-    rafRef.current = requestAnimationFrame(tick);
+  // Keep scheduler notes in sync with feel
+  useEffect(() => {
+    scheduler.setNotes(notes);
+  }, [notes]);
+
+  // Step callback → drives playhead
+  useEffect(() => {
+    scheduler.onStep = (step) => setCurrentStep(step);
   }, []);
 
-  useEffect(() => {
+  const playhead = currentStep >= 0 ? currentStep / STEP_COUNT : 0;
+
+  function togglePlay() {
     if (isPlaying) {
-      startRef.current = null;
-      rafRef.current = requestAnimationFrame(tick);
+      scheduler.stop();
+      setIsPlaying(false);
+      setCurrentStep(-1);
     } else {
-      cancelAnimationFrame(rafRef.current);
-      setPlayhead(0);
+      scheduler.setNotes(notes);
+      scheduler.start();
+      setIsPlaying(true);
     }
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [isPlaying, tick]);
+  }
 
   function setParam(key, val) {
     setFeel(f => ({ ...f, [key]: val }));
@@ -73,6 +76,11 @@ export default function App() {
   function reset() {
     setFeel(DEFAULT_FEEL);
     setActiveState(null);
+    if (isPlaying) {
+      scheduler.stop();
+      scheduler.setNotes(applyFeel(BASE, DEFAULT_FEEL));
+      scheduler.start();
+    }
   }
 
   const controls = [
@@ -140,7 +148,7 @@ export default function App() {
           marginTop: '16px',
         }}>
           <button
-            onClick={() => setIsPlaying(p => !p)}
+            onClick={togglePlay}
             style={{
               fontFamily: 'var(--mono)',
               fontSize: '9px',
