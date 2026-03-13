@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateBasePattern, applyFeel, PRESETS } from './groove';
 import { GrooveScheduler } from './audio';
+import { downloadCard } from './utils/cardExport';
 import GrooveFingerprint from './components/GrooveFingerprint';
 import FeelControl from './components/FeelControl';
 import StateChip from './components/StateChip';
@@ -35,6 +36,7 @@ export default function App() {
   const [currentStep, setCurrentStep] = useState(-1);
   const [bpm, setBpm]                 = useState(120);
   const [applied, setApplied]         = useState(false);
+  const [exporting, setExporting]     = useState(false);
 
   const notes      = applyFeel(BASE, feel);
   const ghostNotes = isAB ? BASE : null;
@@ -86,6 +88,13 @@ export default function App() {
   function applyToClip() {
     setApplied(true);
     setTimeout(() => setApplied(false), 2000);
+  }
+
+  async function exportCard() {
+    setExporting(true);
+    const currentStateName = activeState !== null ? savedStates[activeState]?.name : null;
+    await downloadCard({ notes, feel, bpm, stateName: currentStateName });
+    setExporting(false);
   }
 
   return (
@@ -322,23 +331,45 @@ export default function App() {
           feel as gesture, not data
         </p>
 
-        <button
-          onClick={applyToClip}
-          style={{
-            fontFamily: 'var(--mono)',
-            fontSize: '8px',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: applied ? 'var(--active)' : 'var(--ink)',
-            border: '1px solid',
-            borderColor: applied ? 'var(--active)' : 'var(--ink-20)',
-            borderRadius: '2px',
-            padding: '7px 16px',
-            transition: 'all 0.2s',
-          }}
-        >
-          {applied ? '✓ applied' : 'Apply to Clip'}
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={exportCard}
+            disabled={exporting}
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '8px',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-60)',
+              border: '1px solid var(--ink-20)',
+              borderRadius: '2px',
+              padding: '7px 16px',
+              transition: 'all 0.2s',
+              opacity: exporting ? 0.5 : 1,
+              cursor: exporting ? 'wait' : 'pointer',
+            }}
+          >
+            {exporting ? 'exporting…' : '↓ Export Card'}
+          </button>
+
+          <button
+            onClick={applyToClip}
+            style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '8px',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: applied ? 'var(--active)' : 'var(--ink)',
+              border: '1px solid',
+              borderColor: applied ? 'var(--active)' : 'var(--ink-20)',
+              borderRadius: '2px',
+              padding: '7px 16px',
+              transition: 'all 0.2s',
+            }}
+          >
+            {applied ? '✓ applied' : 'Apply to Clip'}
+          </button>
+        </div>
       </footer>
     </div>
   );
