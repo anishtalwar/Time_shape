@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { generateBasePattern, applyFeel } from './groove';
 import { GrooveScheduler } from './audio';
 import GrooveFingerprint from './components/GrooveFingerprint';
@@ -7,37 +7,34 @@ import StateChip from './components/StateChip';
 import './App.css';
 
 const BASE = generateBasePattern();
-const STEP_COUNT = 16;
-
 const DEFAULT_FEEL = { tight: 0.5, push: 0.5, swing: 0.5, accent: 0.5, drift: 0.5 };
-
 const PRESET_NAMES = ['late & loose', 'tight bounce', 'broken swing', 'nervous pocket'];
-
-// Singleton scheduler
 const scheduler = new GrooveScheduler();
 
+const CONTROLS = [
+  { key: 'tight',  left: 'loose',    right: 'tight'    },
+  { key: 'push',   left: 'behind',   right: 'ahead'    },
+  { key: 'swing',  left: 'straight', right: 'swing'    },
+  { key: 'accent', left: 'even',     right: 'accented' },
+  { key: 'drift',  left: 'stable',   right: 'drifting' },
+];
+
 export default function App() {
-  const [feel, setFeel] = useState(DEFAULT_FEEL);
+  const [feel, setFeel]               = useState(DEFAULT_FEEL);
   const [savedStates, setSavedStates] = useState([null, null, null, null]);
   const [activeState, setActiveState] = useState(null);
-  const [isAB, setIsAB] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const [isAB, setIsAB]               = useState(false);
+  const [isPlaying, setIsPlaying]     = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
+  const [bpm, setBpm]                 = useState(120);
 
   const notes      = applyFeel(BASE, feel);
   const ghostNotes = isAB ? BASE : null;
 
-  // Keep scheduler notes in sync with feel
-  useEffect(() => {
-    scheduler.setNotes(notes);
-  }, [notes]);
-
-  // Step callback → drives playhead
-  useEffect(() => {
-    scheduler.onStep = (step) => setCurrentStep(step);
-  }, []);
-
-  const playhead = currentStep >= 0 ? currentStep / STEP_COUNT : 0;
+  // Keep scheduler synced
+  useEffect(() => { scheduler.setNotes(notes); }, [notes]);
+  useEffect(() => { scheduler.setBpm(bpm); }, [bpm]);
+  useEffect(() => { scheduler.onStep = (step) => setCurrentStep(step); }, []);
 
   function togglePlay() {
     if (isPlaying) {
@@ -57,10 +54,9 @@ export default function App() {
   }
 
   function saveState(slot) {
-    const name = PRESET_NAMES[slot];
     setSavedStates(s => {
       const next = [...s];
-      next[slot] = { feel: { ...feel }, name };
+      next[slot] = { feel: { ...feel }, notes: applyFeel(BASE, feel), name: PRESET_NAMES[slot] };
       return next;
     });
     setActiveState(slot);
@@ -71,99 +67,140 @@ export default function App() {
     if (!s) return;
     setFeel(s.feel);
     setActiveState(slot);
+    if (isPlaying) scheduler.setNotes(applyFeel(BASE, s.feel));
   }
 
   function reset() {
     setFeel(DEFAULT_FEEL);
     setActiveState(null);
-    if (isPlaying) {
-      scheduler.stop();
-      scheduler.setNotes(applyFeel(BASE, DEFAULT_FEEL));
-      scheduler.start();
-    }
+    if (isPlaying) scheduler.setNotes(applyFeel(BASE, DEFAULT_FEEL));
   }
-
-  const controls = [
-    { key: 'tight', left: 'loose',    right: 'tight'    },
-    { key: 'push',  left: 'behind',   right: 'ahead'    },
-    { key: 'swing', left: 'straight', right: 'swing'    },
-    { key: 'accent',left: 'even',     right: 'accented' },
-    { key: 'drift', left: 'stable',   right: 'drifting' },
-  ];
 
   return (
     <div style={{
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
-      padding: '48px 48px 64px',
-      maxWidth: '680px',
+      padding: '36px 52px 48px',
+      maxWidth: '700px',
       margin: '0 auto',
+      overflowX: 'hidden',
     }}>
 
       {/* Header */}
-      <header style={{ marginBottom: '48px' }}>
+      <header style={{ marginBottom: '36px' }}>
         <p style={{
           fontFamily: 'var(--mono)',
-          fontSize: '9px',
-          letterSpacing: '0.12em',
+          fontSize: '8px',
+          letterSpacing: '0.14em',
           textTransform: 'uppercase',
           color: 'var(--ink-60)',
-          marginBottom: '8px',
+          marginBottom: '10px',
         }}>
-          Ableton / Rhythm Study
+          Rhythm Study
         </p>
         <h1 style={{
           fontFamily: 'var(--sans)',
-          fontSize: 'clamp(36px, 8vw, 64px)',
+          fontSize: 'clamp(40px, 9vw, 68px)',
           fontWeight: '300',
-          letterSpacing: '-0.03em',
-          lineHeight: '1',
+          letterSpacing: '-0.035em',
+          lineHeight: '0.95',
           color: 'var(--ink)',
         }}>
           Time Shape
         </h1>
       </header>
 
-      {/* Fingerprint */}
-      <section style={{ marginBottom: '32px' }}>
+      {/* Groove field */}
+      <section style={{ marginBottom: '36px' }}>
+        {/* Section label + annotation */}
         <div style={{
-          padding: '24px 0 16px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'baseline',
           borderTop: '1px solid var(--ink-20)',
-          borderBottom: '1px solid var(--ink-08)',
+          paddingTop: '10px',
+          marginBottom: '16px',
         }}>
-          <GrooveFingerprint
-            notes={notes}
-            ghostNotes={ghostNotes}
-            isPlaying={isPlaying}
-            playhead={playhead}
-          />
+          <p style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '8px',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-60)',
+          }}>
+            Groove field
+          </p>
+          <p style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '8px',
+            letterSpacing: '0.06em',
+            color: 'var(--ink-20)',
+            fontStyle: 'italic',
+            transform: 'rotate(-0.5deg)',
+          }}>
+            fig. 01 / microtiming study
+          </p>
         </div>
+
+        <GrooveFingerprint
+          notes={notes}
+          ghostNotes={ghostNotes}
+          isPlaying={isPlaying}
+          currentStep={currentStep}
+        />
 
         {/* Playback row */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '16px',
-          marginTop: '16px',
+          gap: '18px',
+          marginTop: '18px',
+          borderTop: '1px solid var(--ink-08)',
+          paddingTop: '14px',
         }}>
           <button
             onClick={togglePlay}
             style={{
               fontFamily: 'var(--mono)',
-              fontSize: '9px',
-              letterSpacing: '0.1em',
+              fontSize: '8px',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: isPlaying ? 'var(--active)' : 'var(--ink)',
               border: '1px solid',
               borderColor: isPlaying ? 'var(--active)' : 'var(--ink-20)',
               borderRadius: '2px',
-              padding: '6px 14px',
+              padding: '7px 16px',
               transition: 'all 0.12s',
             }}
           >
             {isPlaying ? '◼ stop' : '▶ play'}
           </button>
+
+          {/* BPM control */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <button
+              onClick={() => setBpm(b => Math.max(60, b - 1))}
+              style={{
+                fontFamily: 'var(--mono)', fontSize: '10px',
+                color: 'var(--ink-60)', width: '16px', textAlign: 'center',
+              }}
+            >−</button>
+            <span style={{
+              fontFamily: 'var(--mono)', fontSize: '8px',
+              letterSpacing: '0.1em', textTransform: 'uppercase',
+              color: 'var(--ink-60)', minWidth: '52px', textAlign: 'center',
+            }}>
+              {bpm} bpm
+            </span>
+            <button
+              onClick={() => setBpm(b => Math.min(200, b + 1))}
+              style={{
+                fontFamily: 'var(--mono)', fontSize: '10px',
+                color: 'var(--ink-60)', width: '16px', textAlign: 'center',
+              }}
+            >+</button>
+          </div>
 
           <label style={{
             display: 'flex',
@@ -171,8 +208,8 @@ export default function App() {
             gap: '8px',
             cursor: 'pointer',
             fontFamily: 'var(--mono)',
-            fontSize: '9px',
-            letterSpacing: '0.1em',
+            fontSize: '8px',
+            letterSpacing: '0.12em',
             textTransform: 'uppercase',
             color: isAB ? 'var(--active)' : 'var(--ink-60)',
             userSelect: 'none',
@@ -181,7 +218,7 @@ export default function App() {
               type="checkbox"
               checked={isAB}
               onChange={e => setIsAB(e.target.checked)}
-              style={{ accentColor: 'var(--active)' }}
+              style={{ accentColor: 'var(--active)', width: '10px', height: '10px' }}
             />
             A/B original
           </label>
@@ -191,8 +228,8 @@ export default function App() {
             style={{
               marginLeft: 'auto',
               fontFamily: 'var(--mono)',
-              fontSize: '9px',
-              letterSpacing: '0.1em',
+              fontSize: '8px',
+              letterSpacing: '0.12em',
               textTransform: 'uppercase',
               color: 'var(--ink-20)',
               transition: 'color 0.12s',
@@ -206,21 +243,25 @@ export default function App() {
       </section>
 
       {/* Feel controls */}
-      <section style={{ marginBottom: '40px' }}>
-        <p style={{
-          fontFamily: 'var(--mono)',
-          fontSize: '9px',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-60)',
+      <section style={{ marginBottom: '32px' }}>
+        <div style={{
+          borderTop: '1px solid var(--ink-20)',
+          paddingTop: '10px',
           marginBottom: '4px',
         }}>
-          Feel
-        </p>
-        {controls.map(({ key, left, right }) => (
+          <p style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '8px',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-60)',
+          }}>
+            Feel
+          </p>
+        </div>
+        {CONTROLS.map(({ key, left, right }) => (
           <FeelControl
             key={key}
-            label={key}
             leftLabel={left}
             rightLabel={right}
             value={feel[key]}
@@ -229,25 +270,31 @@ export default function App() {
         ))}
       </section>
 
-      {/* Saved states */}
-      <section>
-        <p style={{
-          fontFamily: 'var(--mono)',
-          fontSize: '9px',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-60)',
-          marginBottom: '12px',
+      {/* Groove states */}
+      <section style={{ marginBottom: 'auto' }}>
+        <div style={{
+          borderTop: '1px solid var(--ink-20)',
+          paddingTop: '10px',
+          marginBottom: '14px',
         }}>
-          Groove states
-        </p>
-        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+          <p style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '8px',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: 'var(--ink-60)',
+          }}>
+            Groove states
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {savedStates.map((s, i) => (
             <StateChip
               key={i}
               label={s?.name ?? ''}
               active={activeState === i}
               isEmpty={s === null}
+              notes={s?.notes}
               onSelect={() => loadState(i)}
               onSave={() => saveState(i)}
             />
@@ -257,14 +304,29 @@ export default function App() {
 
       {/* Footer */}
       <footer style={{
-        marginTop: 'auto',
-        paddingTop: '48px',
-        fontFamily: 'var(--mono)',
-        fontSize: '9px',
-        letterSpacing: '0.08em',
-        color: 'var(--ink-20)',
+        paddingTop: '56px',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'baseline',
       }}>
-        feel as gesture, not data
+        <p style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '11px',
+          letterSpacing: '0.06em',
+          color: 'var(--ink-60)',
+          fontStyle: 'italic',
+        }}>
+          feel as gesture, not data
+        </p>
+        <p style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '8px',
+          letterSpacing: '0.08em',
+          color: 'var(--ink-20)',
+          textTransform: 'uppercase',
+        }}>
+          2026
+        </p>
       </footer>
     </div>
   );
