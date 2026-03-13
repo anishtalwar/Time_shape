@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --bg: #f4f1ec;
+  --ink: #1a1916;
+  --ink-60: rgba(26, 25, 22, 0.6);
+  --ink-20: rgba(26, 25, 22, 0.2);
+  --ink-08: rgba(26, 25, 22, 0.08);
+  --active: #c8410a;
+  --active-pale: rgba(200, 65, 10, 0.1);
+  --mono: 'Space Mono', monospace;
+  --sans: 'Space Grotesk', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body, #root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  all: unset;
+  cursor: pointer;
+}
+
+input[type=range] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  width: 100%;
+}
+
+input[type=range]::-webkit-slider-track {
+  background: var(--ink-20);
+  height: 1px;
+}
+
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ink);
+  margin-top: -5.5px;
+  transition: background 0.15s;
+}
+
+input[type=range]:focus::-webkit-slider-thumb {
+  background: var(--active);
+}

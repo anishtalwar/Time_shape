@@ -1,0 +1,2 @@
+/* App-level resets — all component styles live inline */
+* { box-sizing: border-box; }
