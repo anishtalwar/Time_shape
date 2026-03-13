@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { generateBasePattern, applyFeel } from './groove';
+import { useState, useEffect, useRef } from 'react';
+import { generateBasePattern, applyFeel, PRESETS } from './groove';
 import { GrooveScheduler } from './audio';
 import GrooveFingerprint from './components/GrooveFingerprint';
 import FeelControl from './components/FeelControl';
@@ -7,34 +7,41 @@ import StateChip from './components/StateChip';
 import './App.css';
 
 const BASE = generateBasePattern();
-const DEFAULT_FEEL = { tight: 0.5, push: 0.5, swing: 0.5, accent: 0.5, drift: 0.5 };
-const PRESET_NAMES = ['late & loose', 'tight bounce', 'broken swing', 'nervous pocket'];
 const scheduler = new GrooveScheduler();
 
+// Start with Late Pocket as the active personality
+const INITIAL_FEEL = PRESETS[0].feel;
+
+// Pre-populate three states; fourth slot is empty
+const INITIAL_STATES = [
+  ...PRESETS.map(p => ({ feel: p.feel, notes: applyFeel(BASE, p.feel), name: p.name })),
+  null,
+];
+
 const CONTROLS = [
-  { key: 'tight',  left: 'loose',    right: 'tight'    },
-  { key: 'push',   left: 'behind',   right: 'ahead'    },
-  { key: 'swing',  left: 'straight', right: 'swing'    },
-  { key: 'accent', left: 'even',     right: 'accented' },
-  { key: 'drift',  left: 'stable',   right: 'drifting' },
+  { key: 'tight',  left: 'loose',    right: 'tight',    group: 'Timing'    },
+  { key: 'push',   left: 'behind',   right: 'ahead',    group: null        },
+  { key: 'swing',  left: 'straight', right: 'swing',    group: 'Phrasing'  },
+  { key: 'accent', left: 'even',     right: 'accented', group: null        },
+  { key: 'drift',  left: 'stable',   right: 'drifting', group: 'Character' },
 ];
 
 export default function App() {
-  const [feel, setFeel]               = useState(DEFAULT_FEEL);
-  const [savedStates, setSavedStates] = useState([null, null, null, null]);
-  const [activeState, setActiveState] = useState(null);
-  const [isAB, setIsAB]               = useState(false);
+  const [feel, setFeel]               = useState(INITIAL_FEEL);
+  const [savedStates, setSavedStates] = useState(INITIAL_STATES);
+  const [activeState, setActiveState] = useState(0);         // Late Pocket active
+  const [isAB, setIsAB]               = useState(true);      // A/B on by default
   const [isPlaying, setIsPlaying]     = useState(false);
   const [currentStep, setCurrentStep] = useState(-1);
   const [bpm, setBpm]                 = useState(120);
+  const [applied, setApplied]         = useState(false);
 
   const notes      = applyFeel(BASE, feel);
   const ghostNotes = isAB ? BASE : null;
 
-  // Keep scheduler synced
   useEffect(() => { scheduler.setNotes(notes); }, [notes]);
   useEffect(() => { scheduler.setBpm(bpm); }, [bpm]);
-  useEffect(() => { scheduler.onStep = (step) => setCurrentStep(step); }, []);
+  useEffect(() => { scheduler.onStep = step => setCurrentStep(step); }, []);
 
   function togglePlay() {
     if (isPlaying) {
@@ -56,7 +63,7 @@ export default function App() {
   function saveState(slot) {
     setSavedStates(s => {
       const next = [...s];
-      next[slot] = { feel: { ...feel }, notes: applyFeel(BASE, feel), name: PRESET_NAMES[slot] };
+      next[slot] = { feel: { ...feel }, notes: applyFeel(BASE, feel), name: PRESETS[slot]?.name ?? `state ${slot + 1}` };
       return next;
     });
     setActiveState(slot);
@@ -71,9 +78,14 @@ export default function App() {
   }
 
   function reset() {
-    setFeel(DEFAULT_FEEL);
-    setActiveState(null);
-    if (isPlaying) scheduler.setNotes(applyFeel(BASE, DEFAULT_FEEL));
+    setFeel(INITIAL_FEEL);
+    setActiveState(0);
+    if (isPlaying) scheduler.setNotes(applyFeel(BASE, INITIAL_FEEL));
+  }
+
+  function applyToClip() {
+    setApplied(true);
+    setTimeout(() => setApplied(false), 2000);
   }
 
   return (
@@ -97,7 +109,7 @@ export default function App() {
           color: 'var(--ink-60)',
           marginBottom: '10px',
         }}>
-          Rhythm Study
+          Groove Shape
         </p>
         <h1 style={{
           fontFamily: 'var(--sans)',
@@ -106,14 +118,22 @@ export default function App() {
           letterSpacing: '-0.035em',
           lineHeight: '0.95',
           color: 'var(--ink)',
+          marginBottom: '10px',
         }}>
           Time Shape
         </h1>
+        <p style={{
+          fontFamily: 'var(--mono)',
+          fontSize: '9px',
+          letterSpacing: '0.06em',
+          color: 'var(--ink-60)',
+        }}>
+          Shape rhythmic feel across MIDI clips
+        </p>
       </header>
 
       {/* Groove field */}
       <section style={{ marginBottom: '36px' }}>
-        {/* Section label + annotation */}
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -122,15 +142,28 @@ export default function App() {
           paddingTop: '10px',
           marginBottom: '16px',
         }}>
-          <p style={{
-            fontFamily: 'var(--mono)',
-            fontSize: '8px',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-60)',
-          }}>
-            Groove field
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <p style={{
+              fontFamily: 'var(--mono)',
+              fontSize: '8px',
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--ink-60)',
+            }}>
+              Groove Field
+            </p>
+            {isPlaying && (
+              <span style={{
+                fontFamily: 'var(--mono)',
+                fontSize: '7px',
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'var(--active)',
+              }}>
+                ● live
+              </span>
+            )}
+          </div>
           <p style={{
             fontFamily: 'var(--mono)',
             fontSize: '8px',
@@ -139,7 +172,7 @@ export default function App() {
             fontStyle: 'italic',
             transform: 'rotate(-0.5deg)',
           }}>
-            fig. 01 / microtiming study
+            Clip 01 / {bpm} BPM
           </p>
         </div>
 
@@ -177,62 +210,42 @@ export default function App() {
             {isPlaying ? '◼ stop' : '▶ play'}
           </button>
 
-          {/* BPM control */}
+          {/* BPM */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               onClick={() => setBpm(b => Math.max(60, b - 1))}
-              style={{
-                fontFamily: 'var(--mono)', fontSize: '10px',
-                color: 'var(--ink-60)', width: '16px', textAlign: 'center',
-              }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--ink-60)', width: '16px', textAlign: 'center' }}
             >−</button>
             <span style={{
               fontFamily: 'var(--mono)', fontSize: '8px',
               letterSpacing: '0.1em', textTransform: 'uppercase',
               color: 'var(--ink-60)', minWidth: '52px', textAlign: 'center',
-            }}>
-              {bpm} bpm
-            </span>
+            }}>{bpm} bpm</span>
             <button
               onClick={() => setBpm(b => Math.min(200, b + 1))}
-              style={{
-                fontFamily: 'var(--mono)', fontSize: '10px',
-                color: 'var(--ink-60)', width: '16px', textAlign: 'center',
-              }}
+              style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--ink-60)', width: '16px', textAlign: 'center' }}
             >+</button>
           </div>
 
+          {/* A/B */}
           <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            cursor: 'pointer',
-            fontFamily: 'var(--mono)',
-            fontSize: '8px',
-            letterSpacing: '0.12em',
+            display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
+            fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '0.12em',
             textTransform: 'uppercase',
             color: isAB ? 'var(--active)' : 'var(--ink-60)',
             userSelect: 'none',
           }}>
-            <input
-              type="checkbox"
-              checked={isAB}
-              onChange={e => setIsAB(e.target.checked)}
-              style={{ accentColor: 'var(--active)', width: '10px', height: '10px' }}
-            />
-            A/B original
+            <input type="checkbox" checked={isAB} onChange={e => setIsAB(e.target.checked)}
+              style={{ accentColor: 'var(--active)', width: '10px', height: '10px' }} />
+            A/B Original
           </label>
 
           <button
             onClick={reset}
             style={{
               marginLeft: 'auto',
-              fontFamily: 'var(--mono)',
-              fontSize: '8px',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: 'var(--ink-20)',
-              transition: 'color 0.12s',
+              fontFamily: 'var(--mono)', fontSize: '8px', letterSpacing: '0.12em',
+              textTransform: 'uppercase', color: 'var(--ink-20)', transition: 'color 0.12s',
             }}
             onMouseEnter={e => e.currentTarget.style.color = 'var(--ink-60)'}
             onMouseLeave={e => e.currentTarget.style.color = 'var(--ink-20)'}
@@ -244,48 +257,41 @@ export default function App() {
 
       {/* Feel controls */}
       <section style={{ marginBottom: '32px' }}>
-        <div style={{
-          borderTop: '1px solid var(--ink-20)',
-          paddingTop: '10px',
-          marginBottom: '4px',
-        }}>
+        <div style={{ borderTop: '1px solid var(--ink-20)', paddingTop: '10px', marginBottom: '4px' }}>
           <p style={{
-            fontFamily: 'var(--mono)',
-            fontSize: '8px',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-60)',
-          }}>
-            Feel
-          </p>
+            fontFamily: 'var(--mono)', fontSize: '8px',
+            letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-60)',
+          }}>Feel</p>
         </div>
-        {CONTROLS.map(({ key, left, right }) => (
-          <FeelControl
-            key={key}
-            leftLabel={left}
-            rightLabel={right}
-            value={feel[key]}
-            onChange={val => setParam(key, val)}
-          />
+
+        {CONTROLS.map(({ key, left, right, group }) => (
+          <div key={key}>
+            {group && (
+              <p style={{
+                fontFamily: 'var(--mono)', fontSize: '7px',
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: 'var(--ink-20)', paddingTop: '8px', paddingBottom: '2px',
+              }}>
+                {group}
+              </p>
+            )}
+            <FeelControl
+              leftLabel={left}
+              rightLabel={right}
+              value={feel[key]}
+              onChange={val => setParam(key, val)}
+            />
+          </div>
         ))}
       </section>
 
       {/* Groove states */}
       <section style={{ marginBottom: 'auto' }}>
-        <div style={{
-          borderTop: '1px solid var(--ink-20)',
-          paddingTop: '10px',
-          marginBottom: '14px',
-        }}>
+        <div style={{ borderTop: '1px solid var(--ink-20)', paddingTop: '10px', marginBottom: '14px' }}>
           <p style={{
-            fontFamily: 'var(--mono)',
-            fontSize: '8px',
-            letterSpacing: '0.12em',
-            textTransform: 'uppercase',
-            color: 'var(--ink-60)',
-          }}>
-            Groove states
-          </p>
+            fontFamily: 'var(--mono)', fontSize: '8px',
+            letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-60)',
+          }}>Groove States</p>
         </div>
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
           {savedStates.map((s, i) => (
@@ -304,29 +310,35 @@ export default function App() {
 
       {/* Footer */}
       <footer style={{
-        paddingTop: '56px',
+        paddingTop: '40px',
         display: 'flex',
         justifyContent: 'space-between',
-        alignItems: 'baseline',
+        alignItems: 'center',
       }}>
         <p style={{
-          fontFamily: 'var(--mono)',
-          fontSize: '11px',
-          letterSpacing: '0.06em',
-          color: 'var(--ink-60)',
-          fontStyle: 'italic',
+          fontFamily: 'var(--mono)', fontSize: '11px',
+          letterSpacing: '0.06em', color: 'var(--ink-60)', fontStyle: 'italic',
         }}>
           feel as gesture, not data
         </p>
-        <p style={{
-          fontFamily: 'var(--mono)',
-          fontSize: '8px',
-          letterSpacing: '0.08em',
-          color: 'var(--ink-20)',
-          textTransform: 'uppercase',
-        }}>
-          2026
-        </p>
+
+        <button
+          onClick={applyToClip}
+          style={{
+            fontFamily: 'var(--mono)',
+            fontSize: '8px',
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: applied ? 'var(--active)' : 'var(--ink)',
+            border: '1px solid',
+            borderColor: applied ? 'var(--active)' : 'var(--ink-20)',
+            borderRadius: '2px',
+            padding: '7px 16px',
+            transition: 'all 0.2s',
+          }}
+        >
+          {applied ? '✓ applied' : 'Apply to Clip'}
+        </button>
       </footer>
     </div>
   );

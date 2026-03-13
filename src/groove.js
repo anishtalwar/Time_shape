@@ -69,3 +69,10 @@ export function noteToX(note, totalSteps = 16) {
 export function noteToY(note) {
   return { kick: 0.25, snare: 0.5, hat: 0.75 }[note.track] ?? 0.5;
 }
+
+// Named groove personalities — pre-populated states
+export const PRESETS = [
+  { name: 'late pocket',  feel: { tight: 0.28, push: 0.32, swing: 0.62, accent: 0.60, drift: 0.52 } },
+  { name: 'tight swing',  feel: { tight: 0.76, push: 0.54, swing: 0.82, accent: 0.70, drift: 0.44 } },
+  { name: 'loose bounce', feel: { tight: 0.16, push: 0.38, swing: 0.56, accent: 0.42, drift: 0.70 } },
+];
